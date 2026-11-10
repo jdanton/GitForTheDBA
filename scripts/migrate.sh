@@ -196,7 +196,7 @@ CREATE TABLE dbo.SchemaVersion
     ScriptName   nvarchar(260) NOT NULL CONSTRAINT PK_SchemaVersion PRIMARY KEY,
     Checksum     char(64)      NOT NULL,
     AppliedUtc   datetime2(0)  NOT NULL CONSTRAINT DF_SchemaVersion_AppliedUtc DEFAULT SYSUTCDATETIME(),
-    AppliedBy    sysname       NOT NULL CONSTRAINT DF_SchemaVersion_AppliedBy  DEFAULT SUSER_SNAME(),
+    AppliedBy    sysname       NOT NULL CONSTRAINT DF_SchemaVersion_AppliedBy  DEFAULT USER_NAME(),
     GitHubActor  nvarchar(100) NULL,
     CommitSha    varchar(40)   NULL,
     RunUrl       nvarchar(400) NULL
@@ -212,8 +212,10 @@ for f in "${pending[@]}"; do
     echo "GO"
     echo ":r $(staged "$f")"
     echo "GO"
-    echo "INSERT dbo.SchemaVersion (ScriptName, Checksum, GitHubActor, CommitSha, RunUrl)"
-    echo "VALUES (N'$(q "$name")', '$(sha256 "$f")', N'$(q "$actor")', '$(q "$commit")', N'$(q "$run_url")');"
+    # USER_NAME() is the database user (gh-runner-lnx-1). SUSER_SNAME() would
+    # give a managed identity's appId@tenant, which nobody can read.
+    echo "INSERT dbo.SchemaVersion (ScriptName, Checksum, AppliedBy, GitHubActor, CommitSha, RunUrl)"
+    echo "VALUES (N'$(q "$name")', '$(sha256 "$f")', USER_NAME(), N'$(q "$actor")', '$(q "$commit")', N'$(q "$run_url")');"
     echo "COMMIT TRANSACTION;"
     echo "GO"
   } > "$work/apply.sql"
