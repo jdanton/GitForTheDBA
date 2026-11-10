@@ -38,7 +38,7 @@ code .github/workflows/deploy-schema.yml
 # =============================================================================
 # 2. A migration with a bug (2 min)
 # =============================================================================
-git switch -c feature/widget-price
+git switch -c widget-price
 
 @"
 ALTER TABLE dbo.Widget
@@ -51,7 +51,7 @@ CREATE INDEX IX_Widget_Name ON dbo.Widget (Nmae);
 
 git add migrations
 git commit -m "Add Price column and Name index to Widget"
-git push -u origin feature/widget-price
+git push -u origin widget-price
 gh pr create --fill
 Start-Sleep 10                  # give GitHub a moment to queue the check
 gh pr checks --watch            # RED: Column name 'Nmae' does not exist
@@ -100,16 +100,16 @@ SELECT * FROM dbo.Widget;"
 # =============================================================================
 # BONUS, if there's time (1 min): try to rewrite history
 # =============================================================================
-git switch -c feature/sneaky-edit
+git switch -c sneaky-edit
 Add-Content migrations/001_create_widget.sql "-- just a small tweak"
 git commit -am "Tweak an applied migration"
-git push -u origin feature/sneaky-edit
+git push -u origin sneaky-edit
 gh pr create --fill
 Start-Sleep 10
 gh pr checks --watch            # RED: 001 was already applied and has changed
 gh pr close --delete-branch
 git switch main
-git branch -D feature/sneaky-edit
+git branch -D sneaky-edit
 
 # =============================================================================
 # RESET AFTER A REHEARSAL
