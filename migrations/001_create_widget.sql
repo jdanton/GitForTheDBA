@@ -10,3 +10,4 @@ GO
 
 INSERT dbo.Widget (Name)
 VALUES (N'Sprocket'), (N'Gizmo'), (N'Doohickey');
+-- just a small tweak
