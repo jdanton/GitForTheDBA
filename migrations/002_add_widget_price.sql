@@ -3,4 +3,4 @@ ALTER TABLE dbo.Widget
         CONSTRAINT DF_Widget_Price DEFAULT (0);
 GO
 
-CREATE INDEX IX_Widget_Name ON dbo.Widget (Nmae);
+CREATE INDEX IX_Widget_Name ON dbo.Widget (Name);
