@@ -144,8 +144,10 @@ out ""
 
 # Write a failure section that names the file and shows the SQL error.
 failed() {
-  local f="$1" log="$2"
-  echo "::error file=$f::$(basename "$f") failed. See the job log for the SQL error."
+  local f="$1" log="$2" msg
+  # The line after "Msg NNN, Level ..." is the readable error text.
+  msg="$(grep -A1 '^Msg ' "$log" | grep -v -e '^Msg ' -e '^--$' | head -n1)"
+  echo "::error file=$f::$(basename "$f") failed: ${msg:-see the job log for the SQL error}"
   out "### ❌ \`$(basename "$f")\` failed"
   out ""
   out '```text'

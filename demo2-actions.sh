@@ -114,9 +114,9 @@ git branch -D sneaky-edit
 # =============================================================================
 # RESET AFTER A REHEARSAL
 # =============================================================================
-# Remove 002 from main (the deploy that this push triggers has nothing to do):
+# Remove 002 from main ([skip ci] so no deploy run waits for approval):
 #   git rm migrations/002_add_widget_price.sql
-#   git commit -m "Reset demo"
+#   git commit -m "Reset demo [skip ci]"
 #   git push
 # Undo it in the database:
 #   sqlcmd -S $server -d $db --authentication-method ActiveDirectoryDefault -Q "
