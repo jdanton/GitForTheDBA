@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) and point it at an existing storage account.
+# terraform init -backend-config=backend.hcl
+resource_group_name  = "rg-tfstate"
+storage_account_name = "sttfstateXXXXX"
+container_name       = "tfstate"
+key                  = "gitforthedba.tfstate"
+use_azuread_auth     = true

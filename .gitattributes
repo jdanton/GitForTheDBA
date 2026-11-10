@@ -1,0 +1,5 @@
+# Migrations are checksummed after they're applied, so their bytes must be the
+# same on every machine. Store and check out SQL and shell scripts with LF.
+*.sql text eol=lf
+*.sh  text eol=lf
+*.tf  text eol=lf

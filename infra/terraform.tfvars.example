@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (gitignored) and fill in.
+subscription_id   = "00000000-0000-0000-0000-000000000000"
+entra_admin_login = "you@yourtenant.onmicrosoft.com"
+presenter_ip      = "203.0.113.10"   # curl -s https://ifconfig.me

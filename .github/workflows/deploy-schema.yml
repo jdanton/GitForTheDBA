@@ -1,0 +1,125 @@
+name: Deploy schema
+
+# Pull request -> "plan": dry-run the pending migrations against Azure SQL in a
+#                 transaction that is rolled back, and post the result on the PR.
+# Merge to main -> "deploy": wait for approval on the production environment,
+#                 then apply the migrations and log them in dbo.SchemaVersion.
+#
+# Both jobs run on the self-hosted runner VM in Azure (see infra/). It signs in
+# to Azure SQL with its managed identity, so this repo stores no database
+# password, not even as a secret. Server and database names are repository
+# variables (Settings > Secrets and variables > Actions > Variables).
+on:
+  pull_request:
+    branches: [ main ]
+    paths: [ 'migrations/**' ]
+  push:
+    branches: [ main ]
+    paths: [ 'migrations/**' ]
+  workflow_dispatch:        # run by hand from the Actions tab
+
+permissions:
+  contents: read
+
+env:
+  SQL_SERVER:   ${{ vars.SQL_SERVER }}
+  SQL_DATABASE: ${{ vars.SQL_DATABASE }}
+
+jobs:
+  plan:
+    name: Plan (dry run)
+    # This is a public repo. Never run fork PRs on a self-hosted runner that can
+    # reach the database: only PRs from branches in this repo get a plan.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [ self-hosted, linux, x64 ]
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: plan-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Check out the PR
+        uses: actions/checkout@v7
+
+      # The runner VM doesn't ship with sqlcmd (or bzip2 to unpack it).
+      # Install the pinned go-sqlcmd binary once; later runs find it on the PATH.
+      - name: Ensure sqlcmd
+        run: |
+          set -euo pipefail
+          if ! command -v sqlcmd >/dev/null; then
+            if ! command -v bzip2 >/dev/null; then
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq bzip2
+            fi
+            curl -fsSL -o /tmp/sqlcmd.tar.bz2 \
+              https://github.com/microsoft/go-sqlcmd/releases/download/v1.10.0/sqlcmd-linux-amd64.tar.bz2
+            tar -xjf /tmp/sqlcmd.tar.bz2 -C /tmp sqlcmd
+            sudo install -m 0755 /tmp/sqlcmd /usr/local/bin/sqlcmd
+            rm -f /tmp/sqlcmd.tar.bz2 /tmp/sqlcmd
+          fi
+          sqlcmd --version
+
+      - name: Dry-run pending migrations
+        run: bash scripts/migrate.sh plan
+
+      - name: Post the plan on the PR
+        if: always()
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- schema-plan -->';
+            const report = fs.existsSync('migration-report.md')
+              ? fs.readFileSync('migration-report.md', 'utf8')
+              : '## Schema plan\n\nThe plan did not produce a report. Check the job log.';
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\n${report}\n[View run](${run})`;
+
+            // Keep a single comment per PR and update it on every push.
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: context.issue.number, per_page: 100,
+            });
+            const mine = comments.find(c => c.body.startsWith(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }
+
+  deploy:
+    name: Deploy to Azure SQL
+    if: github.event_name != 'pull_request'
+    runs-on: [ self-hosted, linux, x64 ]
+    # The production environment requires a reviewer and only accepts main,
+    # so the job waits here until a DBA clicks "Approve and deploy".
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false     # never cancel a deployment halfway
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+
+      # The runner VM doesn't ship with sqlcmd (or bzip2 to unpack it).
+      # Install the pinned go-sqlcmd binary once; later runs find it on the PATH.
+      - name: Ensure sqlcmd
+        run: |
+          set -euo pipefail
+          if ! command -v sqlcmd >/dev/null; then
+            if ! command -v bzip2 >/dev/null; then
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq bzip2
+            fi
+            curl -fsSL -o /tmp/sqlcmd.tar.bz2 \
+              https://github.com/microsoft/go-sqlcmd/releases/download/v1.10.0/sqlcmd-linux-amd64.tar.bz2
+            tar -xjf /tmp/sqlcmd.tar.bz2 -C /tmp sqlcmd
+            sudo install -m 0755 /tmp/sqlcmd /usr/local/bin/sqlcmd
+            rm -f /tmp/sqlcmd.tar.bz2 /tmp/sqlcmd
+          fi
+          sqlcmd --version
+
+      - name: Apply pending migrations
+        run: bash scripts/migrate.sh apply

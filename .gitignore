@@ -1,1 +1,13 @@
 create-runner-vm.sh
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+backend.hcl
+crash.log
+
+# Local output from scripts/migrate.sh
+migration-report.md
